@@ -1,3 +1,5 @@
+import config
+
 class TrafficLightState:
     NAME = "UNKNOWN"
  
