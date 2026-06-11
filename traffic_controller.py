@@ -3,7 +3,8 @@ import config
 from traffic_light  import TrafficLight
 from states         import (CarRedState, CarRedYellowState,
                              CarGreenState, CarYellowState,
-                             PedestrianRedState, PedestrianGreenState)
+                             PedestrianRedState, PedestrianRedYellowState,
+                             PedestrianGreenState, PedestrianYellowState)
 
 from observer       import TrafficSubject
  
@@ -90,10 +91,11 @@ class TrafficController(TrafficSubject):
                     self._ped_interrupt_triggered_at = None
  
             elif isinstance(self._car_state, CarRedState):
-                # Cars are already red — give pedestrians green now
-                self._pedestrian_requested = False
-                self._car_requested        = False  # consume any car req too
-                self._transition_ped(PedestrianGreenState())
+                # Cars are already red — give pedestrians green, but start with Red+Yellow
+                if isinstance(self._ped_state, PedestrianRedState):
+                    self._pedestrian_requested = False
+                    self._car_requested        = False  # consume any car req too
+                    self._transition_ped(PedestrianRedYellowState())
  
         # ── Car light normal cycle ───────────────────────────────
         car_elapsed = now - self._car_state_entered_at
@@ -116,11 +118,19 @@ class TrafficController(TrafficSubject):
         # ── Pedestrian light cycle ───────────────────────────────
         ped_elapsed = now - self._ped_state_entered_at
  
-        if isinstance(self._ped_state, PedestrianGreenState):
+        if isinstance(self._ped_state, PedestrianRedYellowState):
             if ped_elapsed >= self._ped_state.duration_seconds:
-                # Pedestrian green is over — go back to red
+                self._transition_ped(PedestrianGreenState())
+
+        elif isinstance(self._ped_state, PedestrianGreenState):
+            if ped_elapsed >= self._ped_state.duration_seconds:
+                self._transition_ped(PedestrianYellowState())
+
+        elif isinstance(self._ped_state, PedestrianYellowState):
+            if ped_elapsed >= self._ped_state.duration_seconds:
+                # Pedestrian cycle is over — go back to red
                 self._transition_ped(PedestrianRedState())
-                # Give cars the red+yellow → green transition
+                # Only let cars transition to Red+Yellow AFTER pedestrians are completely Red
                 self._transition_car(CarRedYellowState())
  
         # ── Handle car request (only when pedestrians are red) ───
@@ -140,8 +150,8 @@ class TrafficController(TrafficSubject):
         self.notify_observers("cars", self._car_state.NAME)
  
     def _transition_ped(self, new_state):
-        # Safety guard: never allow both green simultaneously
-        if isinstance(new_state, PedestrianGreenState):
+        # Safety guard: never allow pedestrians out of RED if cars are not RED
+        if not isinstance(new_state, PedestrianRedState):
             if not isinstance(self._car_state, CarRedState):
                 return  # Refuse — cars are not red yet
  
@@ -149,4 +159,3 @@ class TrafficController(TrafficSubject):
         self._ped_state.enter(self._ped_light)
         self._ped_state_entered_at = utime.time()
         self.notify_observers("pedestrians", self._ped_state.NAME)
- 

@@ -79,7 +79,10 @@ class CarYellowState(TrafficLightState):
         return CarRedState()
  
 
- 
+# ----------------------------------------------------------
+# Pedestrian traffic light states
+# ----------------------------------------------------------
+
 class PedestrianRedState(TrafficLightState):
     NAME = "RED"
  
@@ -89,6 +92,20 @@ class PedestrianRedState(TrafficLightState):
     @property
     def duration_seconds(self):
         return 9999  # Stays red until a request comes in
+ 
+    def next_state(self):
+        return PedestrianRedYellowState()
+ 
+ 
+class PedestrianRedYellowState(TrafficLightState):
+    NAME = "RED_YELLOW"
+ 
+    def enter(self, light):
+        light.show_red_yellow()
+ 
+    @property
+    def duration_seconds(self):
+        return config.PHASE_RED_YELLOW_DURATION
  
     def next_state(self):
         return PedestrianGreenState()
@@ -103,6 +120,20 @@ class PedestrianGreenState(TrafficLightState):
     @property
     def duration_seconds(self):
         return config.PEDESTRIAN_GREEN_DURATION
+ 
+    def next_state(self):
+        return PedestrianYellowState()
+ 
+
+class PedestrianYellowState(TrafficLightState):
+    NAME = "YELLOW"
+ 
+    def enter(self, light):
+        light.show_yellow()
+ 
+    @property
+    def duration_seconds(self):
+        return config.PHASE_YELLOW_DURATION
  
     def next_state(self):
         return PedestrianRedState()
