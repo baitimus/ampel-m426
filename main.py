@@ -19,10 +19,10 @@ def main():
  
         # Advance the traffic light state machine
         controller.tick()
- 
+        
         # Small sleep to avoid busy-looping and give the Pico W time
         # to process Wi-Fi packets
-        utime.sleep_ms(50)
+        utime.sleep_ms(100)
  
  
 main()
