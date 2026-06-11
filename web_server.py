@@ -181,6 +181,7 @@ class WebServer(TrafficObserver):
             return  # No client waiting — perfectly normal
  
         try:
+            client.settimeout(1.0)
             raw_request = client.recv(1024).decode("utf-8")
             first_line  = raw_request.split("\r\n")[0] if raw_request else ""
             method, path = self._parse_request_line(first_line)
