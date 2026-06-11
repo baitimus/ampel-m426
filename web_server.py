@@ -3,26 +3,13 @@ import network
 import config
 from observer import TrafficObserver
  
- 
 # ----------------------------------------------------------
-# HTML template (inline, minimal, mobile-friendly)
+# HTML template (inline, minimal, no styling)
 # ----------------------------------------------------------
  
 def _build_html(status: dict) -> str:
-    car_color = {
-        "RED":        "#e74c3c",
-        "RED_YELLOW": "#e67e22",
-        "GREEN":      "#2ecc71",
-        "YELLOW":     "#f1c40f",
-    }.get(status["cars"], "#888")
- 
-    ped_color = {
-        "RED":   "#e74c3c",
-        "GREEN": "#2ecc71",
-    }.get(status["pedestrians"], "#888")
- 
-    ped_pending_badge = "<span class='badge'>Anfrage läuft...</span>" if status["ped_pending"] else ""
-    car_pending_badge = "<span class='badge'>Anfrage läuft...</span>" if status["car_pending"] else ""
+    ped_pending = " (Anfrage läuft...)" if status["ped_pending"] else ""
+    car_pending = " (Anfrage läuft...)" if status["car_pending"] else ""
  
     return f"""<!DOCTYPE html>
 <html lang="de">
@@ -31,105 +18,31 @@ def _build_html(status: dict) -> str:
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="refresh" content="2">
   <title>Ampelsteuerung</title>
-  <style>
-    * {{ box-sizing: border-box; margin: 0; padding: 0; }}
-    body {{
-      font-family: Arial, sans-serif;
-      background: #1a1a2e;
-      color: #eee;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 20px;
-      min-height: 100vh;
-    }}
-    h1 {{ font-size: 1.6rem; margin-bottom: 24px; color: #fff; }}
-    .grid {{
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 16px;
-      width: 100%;
-      max-width: 480px;
-    }}
-    .card {{
-      background: #16213e;
-      border-radius: 12px;
-      padding: 20px;
-      text-align: center;
-      border: 2px solid #0f3460;
-    }}
-    .card h2 {{ font-size: 1rem; margin-bottom: 12px; color: #a0aec0; }}
-    .light-circle {{
-      width: 64px;
-      height: 64px;
-      border-radius: 50%;
-      margin: 0 auto 10px;
-      border: 3px solid rgba(255,255,255,0.15);
-    }}
-    .state-label {{ font-size: 0.85rem; font-weight: bold; }}
-    .badge {{
-      display: inline-block;
-      background: #f39c12;
-      color: #000;
-      border-radius: 6px;
-      padding: 2px 6px;
-      font-size: 0.7rem;
-      margin-top: 6px;
-    }}
-    .btn-section {{
-      margin-top: 28px;
-      width: 100%;
-      max-width: 480px;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 16px;
-    }}
-    button {{
-      padding: 16px 8px;
-      border: none;
-      border-radius: 10px;
-      font-size: 1rem;
-      font-weight: bold;
-      cursor: pointer;
-      transition: opacity 0.2s;
-    }}
-    button:active {{ opacity: 0.7; }}
-    .btn-ped  {{ background: #2ecc71; color: #000; }}
-    .btn-car  {{ background: #3498db; color: #fff; }}
-    .footer {{ margin-top: 20px; font-size: 0.7rem; color: #4a5568; }}
-  </style>
 </head>
 <body>
-  <h1>🚦 Ampelsteuerung</h1>
+  <h1>Ampelsteuerung</h1>
  
-  <div class="grid">
-    <div class="card">
-      <h2>Autos</h2>
-      <div class="light-circle" style="background:{car_color};"></div>
-      <div class="state-label">{status['cars']}</div>
-      {car_pending_badge}
-    </div>
-    <div class="card">
-      <h2>Fussgänger</h2>
-      <div class="light-circle" style="background:{ped_color};"></div>
-      <div class="state-label">{status['pedestrians']}</div>
-      {ped_pending_badge}
-    </div>
-  </div>
+  <h2>Autos</h2>
+  <p>Status: <strong>{status['cars']}</strong>{car_pending}</p>
  
-  <div class="btn-section">
-    <form method="POST" action="/pedestrian">
-      <button class="btn-ped" type="submit">🚶 Ich möchte grün!</button>
-    </form>
-    <form method="POST" action="/car">
-      <button class="btn-car" type="submit">🚗 Ich möchte grün!</button>
-    </form>
-  </div>
+  <h2>Fussgaenger</h2>
+  <p>Status: <strong>{status['pedestrians']}</strong>{ped_pending}</p>
  
-  <p class="footer">Seite aktualisiert sich alle 2 Sekunden</p>
+  <hr>
+ 
+  <form method="POST" action="/pedestrian">
+    <button type="submit">Fussgaenger: Ich moechte gruen!</button>
+  </form>
+  
+  <br>
+  
+  <form method="POST" action="/car">
+    <button type="submit">Auto: Ich moechte gruen!</button>
+  </form>
+ 
+  <p><small>Seite aktualisiert sich alle 2 Sekunden</small></p>
 </body>
 </html>"""
- 
  
 # ----------------------------------------------------------
 # WebServer class
@@ -143,7 +56,6 @@ class WebServer(TrafficObserver):
         self._socket = None
         self._controller.register_observer(self)
  
-    # TrafficObserver callback — just keep reference (status fetched live)
     def on_state_changed(self, light_name: str, state_name: str):
         pass  # Status is always fetched fresh from controller.get_status()
  
@@ -168,52 +80,39 @@ class WebServer(TrafficObserver):
         print(f"[WebServer] Listening on port {config.SERVER_PORT}")
  
     def handle_pending_request(self):
-        """Check for an incoming connection and handle it if one is ready.
-        Returns immediately if no client is waiting (non-blocking)."""
+        """Check for an incoming connection and handle it if one is ready."""
         if self._socket is None:
             return
  
         try:
             client, addr = self._socket.accept()
-            # DEBUG ADDED: Log connection success
-            print(f"\n[WebServer] >>> Connection accepted from {addr[0]}")
         except OSError:
-            return  # No client waiting — perfectly normal
+            return  # No client waiting
  
         try:
             client.settimeout(1.0)
             raw_request = client.recv(1024).decode("utf-8")
             first_line  = raw_request.split("\r\n")[0] if raw_request else ""
             method, path = self._parse_request_line(first_line)
-            
-            # DEBUG ADDED: Log the request path
-            print(f"[WebServer] Request received: {method} {path}")
  
             if method == "POST" and path == "/pedestrian":
-                print("[WebServer] Action: Pedestrian green button pressed!") # DEBUG ADDED
                 self._controller.request_pedestrian_green()
                 self._send_redirect(client, "/")
  
             elif method == "POST" and path == "/car":
-                print("[WebServer] Action: Car green button pressed!") # DEBUG ADDED
                 self._controller.request_car_green()
                 self._send_redirect(client, "/")
  
             elif path == "/status":
-                print("[WebServer] Action: Serving status JSON") # DEBUG ADDED
                 self._send_json(client, self._controller.get_status())
  
             else:
-                # Default: serve the main page
-                print("[WebServer] Action: Serving main HTML webpage") # DEBUG ADDED
                 html = _build_html(self._controller.get_status())
                 self._send_html(client, html)
  
         except Exception as error:
             print(f"[WebServer] Error handling request: {error}")
         finally:
-            # DEBUG ADDED: Log connection closure
-            print(f"[WebServer] <<< Closing connection to {addr[0]}")
             client.close()
  
     # ----------------------------------------------------------
