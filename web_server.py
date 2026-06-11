@@ -175,6 +175,8 @@ class WebServer(TrafficObserver):
  
         try:
             client, addr = self._socket.accept()
+            # DEBUG ADDED: Log connection success
+            print(f"\n[WebServer] >>> Connection accepted from {addr[0]}")
         except OSError:
             return  # No client waiting — perfectly normal
  
@@ -182,26 +184,35 @@ class WebServer(TrafficObserver):
             raw_request = client.recv(1024).decode("utf-8")
             first_line  = raw_request.split("\r\n")[0] if raw_request else ""
             method, path = self._parse_request_line(first_line)
+            
+            # DEBUG ADDED: Log the request path
+            print(f"[WebServer] Request received: {method} {path}")
  
             if method == "POST" and path == "/pedestrian":
+                print("[WebServer] Action: Pedestrian green button pressed!") # DEBUG ADDED
                 self._controller.request_pedestrian_green()
                 self._send_redirect(client, "/")
  
             elif method == "POST" and path == "/car":
+                print("[WebServer] Action: Car green button pressed!") # DEBUG ADDED
                 self._controller.request_car_green()
                 self._send_redirect(client, "/")
  
             elif path == "/status":
+                print("[WebServer] Action: Serving status JSON") # DEBUG ADDED
                 self._send_json(client, self._controller.get_status())
  
             else:
                 # Default: serve the main page
+                print("[WebServer] Action: Serving main HTML webpage") # DEBUG ADDED
                 html = _build_html(self._controller.get_status())
                 self._send_html(client, html)
  
         except Exception as error:
             print(f"[WebServer] Error handling request: {error}")
         finally:
+            # DEBUG ADDED: Log connection closure
+            print(f"[WebServer] <<< Closing connection to {addr[0]}")
             client.close()
  
     # ----------------------------------------------------------
