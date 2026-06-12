@@ -33,8 +33,7 @@ This document describes the GPIO pin layout and wiring for the traffic light (Am
 ```
 
 **Wiring Notes:**
-* Each LED needs a 220Ω–330Ω resistor in series (between pin and LED).
-* GP17 (Pin 22) on Ampel 2 is unused (no yellow on pedestrian light in code).
+
 
 ## Pin Mappings
 
